@@ -1,1 +1,1 @@
-# download-3dtiles-glb-from-nlsc
+# download-glb-from-nlsc-3dtiles
