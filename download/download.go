@@ -11,14 +11,24 @@ import (
 	"github.com/HazelnutParadise/Go-Utils/asyncutil"
 )
 
-func DownloadGLBsFromJsonUrl(jsonUrl string, outputDir string) {
+func DownloadGLBsFromJsonUrl(jsonUrl string, outputDir string, numGoroutines ...int) {
 	// 建立輸出目錄
 	makeDirIfNotExist(outputDir)
 	// 取得所有 GLB 檔案的 URL
 	glbUrls := getGlbUrlsFromJsonUrl(jsonUrl)
-	// 一次下載10個檔案
-	const maxParallelDownloads = 10
-	asyncutil.ParallelForEach(glbUrls, func(_ int, url string) int {
+
+	var maxParallelDownloads int
+	if len(numGoroutines) > 1 {
+		log.Fatalf("Too many arguments for DownloadGLBsFromJsonUrl function")
+	} else if len(numGoroutines) == 0 {
+		// 一次下載10個檔案
+		maxParallelDownloads = 60
+	} else {
+		maxParallelDownloads = numGoroutines[0]
+	}
+
+	fmt.Printf("Downloading %d GLB files to %s\n", len(glbUrls), outputDir)
+	asyncutil.ParallelForEach(glbUrls, func(_ int, url string) uint8 {
 		DownloadGLB(url, outputDir, DownloadOptions{DontCheckDirExist: true})
 		return 0
 	}, maxParallelDownloads)
@@ -37,10 +47,17 @@ func DownloadGLB(url string, outputDir string, options ...DownloadOptions) {
 		makeDirIfNotExist(outputDir)
 	}
 	// 下載 GLB 檔案
-	resp, err := http.Get(url)
-	if err != nil {
-		log.Fatalf("Failed to download GLB file: %v\n", err)
+	var resp *http.Response
+	for {
+		var err error
+		resp, err = http.Get(url)
+		if err != nil {
+			log.Printf("Failed to download GLB file: %v, retrying\n", err)
+			continue
+		}
+		break
 	}
+
 	defer resp.Body.Close()
 
 	// 建立輸出檔案
